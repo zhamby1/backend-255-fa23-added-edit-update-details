@@ -4,6 +4,7 @@ var cors = require('cors')
 const jwt = require('jwt-simple');
 const app = express();
 const User = require("./models/users");
+const bcrypt = require("bcryptjs")
 
 
 app.use(cors())
@@ -21,9 +22,12 @@ router.post("/user", async(req,res) =>{
    if(!req.body.username || !req.body.password){
       res.status(400).json({error: "Missing username or passwword"})
    }
+
+   //create a hash to encrypt the password
+   const hash = bcrypt.hashSync(req.body.password, 10)
    const newUser = await new User({
       username: req.body.username,
-      password: req.body.password,
+      password: hash,
       status: req.body.status
    })
    try{
@@ -50,10 +54,10 @@ router.post("/auth", async(req,res) =>{
       }
       else{
          //check the username and password to see if they match
-         if(user.password === req.body.password){
+        if(bcrypt.compareSync(req.body.password,user.password)){
             //create a token
             const token = jwt.encode({username: user.username}, secret)
-            res.json({token: token, username: user.username})
+            res.json({token: token, username: user.username, userID: user._id})
          }
          else{
             res.status(401).json({error: "Invalid password"})
@@ -139,6 +143,19 @@ router.delete("/songs/:id", async(req,res) =>{
    }
 })
 
+router.put("/playlist", async(req,res) =>{
+   try{
+      const user = await User.findById(req.body.userID)
+      await user.updateOne({$push: {playlist: req.body.songID}})
+      console.log(user)
+      
+      
+      res.sendStatus(204)
+   }
+   catch(err){
+      res.status(400).send(err)
+   }
+})
 
 app.use("/api", router);
 
